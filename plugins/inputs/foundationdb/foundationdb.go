@@ -3,6 +3,8 @@ package foundationdb
 import (
 	"fmt"
 	"encoding/json"
+	"strings"
+	"errors"
 
 	"github.com/influxdata/telegraf"
 	"github.com/influxdata/telegraf/plugins/inputs"
@@ -58,10 +60,11 @@ func flattenInterface(input map[string]interface{}, prefix string, output map[st
 	}
 }
 
-func (s *FoundationDB) generatePoint(acc telegraf.Accumulator, measurement string, v map[string]interface{}, tags map[string]interface{}) error {
+func (s *FoundationDB) generatePoint(acc telegraf.Accumulator, cluster string, measurement string, v map[string]interface{}, tags map[string]interface{}) error {
 	flat := make(map[string]interface{})
 	flattenInterface(v, "", flat)
 	tmptags := make(map[string]string)
+	tmptags["cluster"] = cluster
 	for k, rawv := range tags {
 		switch v := rawv.(type) {
 		case string:
@@ -95,40 +98,83 @@ func (s *FoundationDB) Gather(acc telegraf.Accumulator) error {
 		return nil
 	}
 
-	cluster := data["cluster"].(map[string]interface{})
+	var cluster map[string]interface{}
+	switch v := data["cluster"].(type) {
+	case map[string]interface{}:
+		cluster = v
+	}
 
-	// TODO layer instances
+	var clusterid string
+	if connstr, ok := cluster["connection_string"]; ok {
+		switch v := connstr.(type) {
+		case string:
+			clusterid = strings.SplitN(v, ":", 2)[0]
+		default:
+			return errors.New("cluster connection string isn't a string")
+		}
+	} else {
+		// no connection string, so no cluster identifier
+		return errors.New("no cluster identifier")
+	}
 	
-	//fmt.Println("processes", cluster["processes"])
-	processes := cluster["processes"].(map[string]interface{})
+	// TODO layer instances
+
+	var processes map[string]interface{}
+	switch v := cluster["processes"].(type) {
+	case map[string]interface{}:
+		processes = v
+	}
 	delete(cluster, "processes")
-	//fmt.Println("machines", cluster["machines"])
-	machines := cluster["machines"].(map[string]interface{})
+
+	var machines map[string]interface{}
+	switch v := cluster["machines"].(type) {
+	case map[string]interface{}:
+		machines = v
+	}
 	delete(cluster, "machines")
 
-	s.generatePoint(acc, "cluster", cluster, map[string]interface{}{})
+	s.generatePoint(acc, clusterid, "cluster", cluster, map[string]interface{}{})
 	
 	for _, v := range processes {
 		process := v.(map[string]interface{})
-		//fmt.Println("roles", process["roles"])
-		roles := process["roles"].([]interface{})
+		var roles []interface{}
+		switch v := process["roles"].(type) {
+		case []interface{}:
+			roles = v
+		}
 		delete(process, "roles")
-		locality := process["locality"].(map[string]interface{})
+
+		var locality map[string]interface{}
+		switch v := process["locality"].(type) {
+		case map[string]interface{}:
+			locality = v
+		default:
+			// without locality, don't produce data points
+			continue
+		}
 		delete(process, "locality")
-		s.generatePoint(acc, "process", process, locality)
+		s.generatePoint(acc, clusterid, "process", process, locality)
+
 		for _, vr := range roles {
 			role := vr.(map[string]interface{})
 			locality["role"] = role["role"].(string)
 			delete(role, "role")
-			s.generatePoint(acc, "role", role, locality)
+			s.generatePoint(acc, clusterid, "role", role, locality)
 		}
 	}
 
 	for _, v := range machines {
 		machine := v.(map[string]interface{})
-		locality := machine["locality"].(map[string]interface{})
+		var locality map[string]interface{}
+		switch v := machine["locality"].(type) {
+		case map[string]interface{}:
+			locality = v
+		default:
+			// without locality, don't produce data points
+			continue
+		}
 		delete(machine, "locality")
-		s.generatePoint(acc, "machine", machine, locality)
+		s.generatePoint(acc, clusterid, "machine", machine, locality)
 	}
 
 	for layername, rawmaybelayerinfo := range cluster["layers"].(map[string]interface{}) {
@@ -139,7 +185,7 @@ func (s *FoundationDB) Gather(acc telegraf.Accumulator) error {
 				instances := maybelayerinfo["instances"].(map[string]interface{})
 				delete(maybelayerinfo, "instances")
 				for k, rawv := range instances {
-					s.generatePoint(acc, "layer_"+layername, rawv.(map[string]interface{}),
+					s.generatePoint(acc, clusterid, "layer_"+layername, rawv.(map[string]interface{}),
 						map[string]interface{}{"instance": k})
 				}
 			}

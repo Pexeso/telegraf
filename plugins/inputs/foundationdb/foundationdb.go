@@ -133,6 +133,13 @@ func (s *FoundationDB) Gather(acc telegraf.Accumulator) error {
 	}
 	delete(cluster, "machines")
 
+	var layers map[string]interface{}
+	switch v := cluster["layers"].(type) {
+	case map[string]interface{}:
+		layers = v
+	}
+	delete(cluster, "layers")
+	
 	s.generatePoint(acc, clusterid, "cluster", cluster, map[string]interface{}{})
 	
 	for _, v := range processes {
@@ -177,7 +184,7 @@ func (s *FoundationDB) Gather(acc telegraf.Accumulator) error {
 		s.generatePoint(acc, clusterid, "machine", machine, locality)
 	}
 
-	for layername, rawmaybelayerinfo := range cluster["layers"].(map[string]interface{}) {
+	for layername, rawmaybelayerinfo := range layers {
 		switch maybelayerinfo := rawmaybelayerinfo.(type) {
 		case map[string]interface{}:
 			if _, ok := maybelayerinfo["instances"]; ok {

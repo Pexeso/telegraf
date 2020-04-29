@@ -20,6 +20,20 @@ type FoundationDB struct {
 
 func (s *FoundationDB) SampleConfig() string {
 	return `
+# IMPORTANT NOTES
+# 1) This fetches the JSON status from the cluster and processes
+# it. That's cluster-wide information, so you only need to run
+# this plugin once per cluster.
+# 2) Fetching the JSON status is slightly expensive, you don't
+# want to do it more or faster than is necessary. So you should
+# only run this plugin once per cluster.
+# 3) This plugin produces a lot of data every time it runs, with
+# the amount proportional to cluster size.
+# Consider lowering the telegraf metric_batch setting dramatically
+# to help out the output plugins. In particular, the Influx plugin
+# experiences significant weirdness if metric_batch is left at
+# the default value.
+
 ## Specific clusterfile to use, or leave undefined/empty for default
 # cluster_file = /etc/foundationdb/fdb.cluster
 `
@@ -31,7 +45,7 @@ func (s *FoundationDB) Description() string {
 
 func (s *FoundationDB) StartConnection() {
 	if !s.connected {
-		fdb.MustAPIVersion(610)
+		fdb.MustAPIVersion(620)
 		if len(s.ClusterFile) > 0 {
 			s.db = fdb.MustOpenDatabase(s.ClusterFile)
 		} else {

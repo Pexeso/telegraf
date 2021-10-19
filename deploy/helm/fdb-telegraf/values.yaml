@@ -1,0 +1,4 @@
+registry: pexae.azurecr.io
+secret: pexae
+image: fdb-telegraf
+tag: test-telegraf

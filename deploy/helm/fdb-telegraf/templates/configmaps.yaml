@@ -1,0 +1,35 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fdb-telegraf-cluster
+  labels:
+    ae-subsystem: lookup
+data:
+  fdb.cluster: psandaefdb:oitF32Vq@10.127.3.4:4500,10.127.3.5:4500
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fdb-telegraf-config
+  labels:
+    ae-subsystem: lookup
+data:
+  telegraf.conf: |
+    [agent]
+      interval = "15s"
+      metric_batch_size = 500
+      metric_buffer_limit = 10000
+      collection_jitter = "1s"
+      flush_interval = "20s"
+      flush_jitter = "1s"
+      precision = ""
+    [[outputs.influxdb]]
+      urls = ["http://influxdb:8086"]
+      database = "ae"
+      timeout = "60s"
+      content_encoding = "gzip"
+    [[inputs.foundationdb]]
+      cluster_file = "fdb.cluster"
+

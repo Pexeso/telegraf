@@ -1,0 +1,37 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fdb-telegraf
+  labels:
+    app: fdb-telegraf
+spec:
+  selector:
+    matchLabels:
+      app: fdb-telegraf
+  template:
+    metadata:
+      labels:
+        app: fdb-telegraf
+    spec:
+      nodeSelector:
+        "kubernetes.io/os": linux
+      imagePullSecrets:
+        - name: {{$.Values.secret}}
+      volumes:
+        - name: config
+          configMap:
+            name: fdb-telegraf-config
+        - name: cluster
+          configMap:
+            name: fdb-telegraf-cluster
+      containers:
+        - name: fdb-telegraf
+          image: {{printf "%s/%s:%s" $.Values.registry $.Values.image $.Values.tag}}
+          imagePullPolicy: Always
+          volumeMounts:
+            - name: config
+              mountPath: /etc/telegraf/
+            - name: cluster
+              mountPath: /opt/ae/fdb.cluster
+              subPath: fdb.cluster

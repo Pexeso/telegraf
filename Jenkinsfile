@@ -1,5 +1,5 @@
 node('!win') {
-    def registryName = 'pexae.azurecr.io' 
+    def registryName = 'pexae.azurecr.io'
     def buildImageName = "${registryName}/ae-build:1.0"
 
     stage 'checkout'
@@ -35,7 +35,7 @@ node('!win') {
         stage 'deploy'
 
         docker.build("${registryName}/fdb-telegraf:${env.TAG_NAME}",
-            '-f container/Dockerfile bin'
+            '-f deploy/docker/Dockerfile bin'
         ).push()
     }
 }
